@@ -1,0 +1,347 @@
+================================================================
+  SIGMA DATA TECH — DAY 4 HANDS-ON LABS
+  Lab 1 of Day 4 — Databases: RDS (SQLite) + DynamoDB Simulation
+  Duration: 30 minutes MAX
+================================================================
+
+WHAT YOU WILL BUILD:
+  SQLite as a stand-in for RDS (same SQL concepts apply)
+  Multi-table relational schema (transactions + merchants)
+  Read Replica pattern (copy for heavy reads)
+  DynamoDB key-value lookup simulation using Python dict
+  RDS → S3 ETL extract (what Glue does in production)
+
+----------------------------------------------------------------
+STEP 1 — SETUP
+----------------------------------------------------------------
+
+# Create the lab folder
+mkdir -p ~/day3-lab2
+cd ~/day3-lab2
+
+# Verify sqlite3 is available
+sqlite3 --version
+
+# If not available Install SQLite — lightweight file-based database engine
+
+# Verify Python libraries
+python3 -c "import pandas, sqlite3; print('All OK')"
+
+#If not available install pandas
+
+
+----------------------------------------------------------------
+STEP 2 — CREATE THE RDS-STYLE DATABASE (SQLite)
+----------------------------------------------------------------
+
+nano setup_rds.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import sqlite3
+import random
+
+random.seed(42)
+
+conn = sqlite3.connect('sigma_rds.db')
+cur  = conn.cursor()
+
+# Create tables (as you would in real RDS)
+cur.executescript("""
+CREATE TABLE IF NOT EXISTS merchants (
+    merchant_id   TEXT PRIMARY KEY,
+    merchant_name TEXT NOT NULL,
+    category      TEXT,
+    city          TEXT,
+    joined_date   TEXT
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+    txn_id      TEXT PRIMARY KEY,
+    merchant_id TEXT,
+    customer    TEXT,
+    amount      REAL,
+    status      TEXT,
+    txn_date    TEXT,
+    FOREIGN KEY (merchant_id) REFERENCES merchants(merchant_id)
+);
+""")
+
+# Seed merchants
+merchant_data = [
+    ('M001','Swiggy',   'Food Delivery', 'Bengaluru','2022-01-15'),
+    ('M002','Zomato',   'Food Delivery', 'Delhi',    '2022-02-10'),
+    ('M003','Amazon',   'E-Commerce',    'Mumbai',   '2021-06-01'),
+    ('M004','Flipkart', 'E-Commerce',    'Bengaluru','2021-08-20'),
+    ('M005','Uber',     'Transport',     'Mumbai',   '2022-03-05'),
+    ('M006','Ola',      'Transport',     'Hyderabad','2022-04-12'),
+    ('M007','BigBasket','Grocery',       'Chennai',  '2022-05-18'),
+    ('M008','PhonePe',  'Fintech',       'Pune',     '2021-11-30'),
+]
+cur.executemany("INSERT OR IGNORE INTO merchants VALUES (?,?,?,?,?)", merchant_data)
+
+# Seed transactions
+customers = ['Priya Sharma','Rahul Verma','Anjali Gupta','Karthik Nair',
+             'Sneha Iyer','Vikram Mehta','Divya Menon','Arjun Das']
+statuses  = ['success','success','success','failed']
+m_ids     = [m[0] for m in merchant_data]
+
+for i in range(1, 101):
+    cur.execute("INSERT OR IGNORE INTO transactions VALUES (?,?,?,?,?,?)", (
+        f'TXN{i:04d}',
+        random.choice(m_ids),
+        random.choice(customers),
+        round(random.uniform(50, 5000), 2),
+        random.choice(statuses),
+        f'2024-01-{random.randint(1,28):02d}'
+    ))
+
+conn.commit()
+conn.close()
+print("sigma_rds.db created with merchants + transactions tables")
+print("100 transactions, 8 merchants loaded")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 setup_rds.py
+
+
+----------------------------------------------------------------
+STEP 3 — QUERY THE RDS (OLTP-style queries)
+----------------------------------------------------------------
+
+# Open SQLite — same as connecting to RDS in production
+sqlite3 sigma_rds.db
+
+-- See all tables
+.tables
+
+-- Describe structure
+.schema transactions
+
+-- OLTP query 1: look up a single transaction (fast by primary key)
+SELECT t.txn_id, m.merchant_name, t.customer, t.amount, t.status
+FROM transactions t
+JOIN merchants m ON t.merchant_id = m.merchant_id
+WHERE t.txn_id = 'TXN0042';
+
+
+-- OLTP query 2: all transactions for one merchant
+SELECT t.txn_id, t.customer, t.amount, t.txn_date
+FROM transactions t
+JOIN merchants m ON t.merchant_id = m.merchant_id
+WHERE m.merchant_name = 'Swiggy'
+AND   t.status = 'success'
+ORDER BY t.amount DESC;
+
+
+-- OLTP query 3: count by status (health check)
+SELECT status, COUNT(*) as total
+FROM transactions
+GROUP BY status;
+
+
+-- This is a HEAVY analytical query — bad for RDS primary, use Read Replica
+SELECT m.category,
+       COUNT(*)        AS txns,
+       SUM(t.amount)   AS revenue,
+       AVG(t.amount)   AS avg_ticket
+FROM transactions t
+JOIN merchants m ON t.merchant_id = m.merchant_id
+WHERE t.status = 'success'
+GROUP BY m.category
+ORDER BY revenue DESC;
+
+-- Exit SQLite
+.quit
+
+
+#CHECKPOINT1
+You just ran a JOIN between the transactions table and the merchants table to get the merchant name. Look at your transactions table — it only stores merchant_id like M001 or M002, not the actual name. Why do you think the database was designed this way instead of just storing the merchant name directly in every transaction row?
+Note your Answers in Word file
+
+----------------------------------------------------------------
+STEP 4 — SIMULATE READ REPLICA (copy DB for heavy reads)
+----------------------------------------------------------------
+
+nano read_replica.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import sqlite3
+import shutil
+
+# Simulate Read Replica: take a copy of primary DB
+# In real RDS this is async replication, not a file copy
+# The concept is identical: reads go to replica, not primary
+
+shutil.copy('sigma_rds.db', 'sigma_rds_replica.db')
+print("Read Replica created: sigma_rds_replica.db")
+
+# Heavy analytical query goes to REPLICA — never primary
+conn = sqlite3.connect('sigma_rds_replica.db')
+import pandas as pd
+
+print("\nRunning heavy report on REPLICA (not primary)...")
+
+query = """
+SELECT m.merchant_name,
+       m.category,
+       COUNT(t.txn_id)  AS total_txns,
+       SUM(t.amount)    AS total_revenue,
+       ROUND(AVG(t.amount), 2) AS avg_ticket,
+       MAX(t.amount)    AS max_txn
+FROM transactions t
+JOIN merchants m ON t.merchant_id = m.merchant_id
+WHERE t.status = 'success'
+GROUP BY m.merchant_name, m.category
+ORDER BY total_revenue DESC
+"""
+
+df = pd.read_sql_query(query, conn)
+print(df.to_string(index=False))
+conn.close()
+
+print("\nPrimary DB left untouched — zero impact on production OLTP.")
+print("In RDS: Point Glue / reporting tools at replica endpoint.")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 read_replica.py
+
+#CHECKPOINT2
+The script says "Primary DB left untouched." Your heavy report ran on the replica copy, not the original database. Think about Sigma Data Tech's live app where customers are making payments right now — what would happen if that heavy GROUP BY report ran on the same database that is processing live payments?
+Note your Answers in Word File
+
+----------------------------------------------------------------
+STEP 5 — DYNAMODB SIMULATION (key-value lookup)
+----------------------------------------------------------------
+
+nano dynamodb_sim.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import time
+import random
+
+# Simulate DynamoDB table: partition_key=txn_id
+# In DynamoDB this lookup is always O(1) — sub-millisecond
+
+# Build in-memory DynamoDB-style table (dict = hash map)
+print("Loading DynamoDB table (partition_key=txn_id)...")
+
+dynamo_table = {}
+for i in range(1, 10001):   # 10,000 transactions
+    txn_id = f'TXN{i:06d}'
+    dynamo_table[txn_id] = {
+        'txn_id'  : txn_id,
+        'status'  : random.choice(['processing','complete','failed']),
+        'merchant': random.choice(['Swiggy','Amazon','Uber','PhonePe']),
+        'amount'  : round(random.uniform(50, 5000), 2),
+        'updated' : '2024-01-15T14:30:00Z'
+    }
+
+print(f"Table loaded: {len(dynamo_table):,} items")
+
+# DynamoDB GetItem — O(1) lookup by partition key
+print("\n--- DynamoDB GetItem (single key lookup) ---")
+lookup_keys = ['TXN000042', 'TXN005000', 'TXN009999']
+
+for key in lookup_keys:
+    start = time.perf_counter()
+    item  = dynamo_table.get(key, 'NOT FOUND')
+    end   = time.perf_counter()
+    ms    = (end - start) * 1000
+    print(f"Key: {key} → Status: {item['status']:12} Amount: {item['amount']:>8.2f}  [{ms:.4f}ms]")
+
+# Scan — DynamoDB GetItem vs Scan comparison
+print("\n--- DynamoDB Scan (reads ENTIRE table — expensive) ---")
+start  = time.perf_counter()
+failed = [v for v in dynamo_table.values() if v['status'] == 'failed']
+end    = time.perf_counter()
+ms     = (end - start) * 1000
+print(f"Scan all 10,000 items → found {len(failed)} failed → took {ms:.2f}ms")
+print("In real DynamoDB: Scan on 1M items = expensive + slow.")
+print("Lesson: Design your access patterns BEFORE creating DynamoDB tables.")
+print("Use partition key for point lookups. Never rely on Scan in production.")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 dynamodb_sim.py
+
+#CHECKPOINT 3
+Your terminal showed GetItem took 0.0020ms to find one transaction out of 10,000. The Scan took much longer and read all 10,000 rows to find the failed ones. Look at both results on your screen — if the table had 1 million rows instead of 10,000 what do you predict happens to the GetItem time and the Scan time? Note your Answers in Word File
+
+----------------------------------------------------------------
+STEP 6 — RDS TO S3 ETL EXTRACT (what Glue does)
+----------------------------------------------------------------
+
+nano rds_to_s3_etl.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import sqlite3
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import os
+
+print("=" * 55)
+print("Simulating: Glue ETL — Extract from RDS → Write to S3")
+print("=" * 55)
+
+# EXTRACT from RDS (SQLite stands in for RDS)
+conn = sqlite3.connect('sigma_rds.db')
+df = pd.read_sql_query("""
+    SELECT t.txn_id, m.merchant_name, m.category,
+           t.customer, t.amount, t.status, t.txn_date
+    FROM transactions t
+    JOIN merchants m ON t.merchant_id = m.merchant_id
+    WHERE t.status = 'success'
+""", conn)
+conn.close()
+print(f"EXTRACT: {len(df)} rows pulled from RDS")
+
+# TRANSFORM
+df['revenue_band'] = pd.cut(
+    df['amount'],
+    bins=[0, 500, 1500, 3000, 5000],
+    labels=['low','medium','high','premium']
+)
+print(f"TRANSFORM: revenue_band column added")
+
+# LOAD to S3 (simulated as local Parquet)
+os.makedirs('s3_output/silver/rds_extract', exist_ok=True)
+out_path = 's3_output/silver/rds_extract/transactions_enriched.parquet'
+pq.write_table(pa.Table.from_pandas(df), out_path, compression='snappy')
+
+size_kb = os.path.getsize(out_path) / 1024
+print(f"LOAD: Written to {out_path} ({size_kb:.1f} KB Parquet)")
+print("\nSample output:")
+print(df[['txn_id','merchant_name','amount','revenue_band']].head(8).to_string(index=False))
+print("\nIn production: Glue JDBC connection reads from RDS endpoint.")
+print("Output writes directly to s3://sigma-data-lake/silver/")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 rds_to_s3_etl.py
+
+# Read from the paraquet file
+
+#Copy paste the below command to see contents of paraquet file
+
+python3 -c "
+import pandas as pd
+import pyarrow.parquet as pq
+
+df = pq.read_table('s3_output/silver/rds_extract/transactions_enriched.parquet').to_pandas()
+print(df.shape)
+print(df.head(10))
+print(df.dtypes)
+"
+
+Paste the output of Paraquet file into Word File along with answers to Checkpoint and upload to sharepoint
+
+================================================================
+  LAB 1 DONE!
+================================================================

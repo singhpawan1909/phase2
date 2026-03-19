@@ -1,0 +1,349 @@
+================================================================
+  SIGMA DATA TECH — EC2 HANDS-ON LAB
+  Day 2 | Commands Reference Sheet
+================================================================
+
+
+----------------------------------------------------------------
+BLOCK 1 — CONNECT TO YOUR EC2
+----------------------------------------------------------------
+
+# Restrict key file permissions — SSH will refuse to connect without this
+chmod 400 <youpemfile>.pem
+
+# Connect to your EC2 instance — replace <YOUR-EC2-IP> with your actual IP
+ssh -i <youpemfile>.pem ec2-user@<YOUR-EC2-IP>
+
+
+----------------------------------------------------------------
+BLOCK 2 — EXPLORE YOUR MACHINE
+----------------------------------------------------------------
+
+# Show the current logged-in username
+whoami
+
+# Show the hostname of this EC2 machine
+hostname
+
+# Show the Linux kernel version and system architecture
+uname -a
+
+# Show the operating system name and version
+cat /etc/os-release
+
+# Show number of CPU cores available on this EC2
+nproc
+
+# Show total, used and free RAM on this EC2
+free -h
+
+# Show total, used and free disk space on this EC2
+df -h
+
+# Show how long this EC2 has been running since last start
+uptime
+
+# Show the private IP address of this EC2 (inside VPC)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4
+
+# Show the public IP address of this EC2 (facing internet)
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4
+
+# Show the instance type — tells you CPU and RAM class of this EC2
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-type
+
+# Show which Availability Zone this EC2 is running in
+curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone
+
+
+----------------------------------------------------------------
+BLOCK 3 — INSTALL DE TOOLS
+----------------------------------------------------------------
+
+# Update all system packages to latest version
+sudo yum update -y
+
+# Confirm Python 3 is already installed
+python3 --version
+
+# Install pip — the Python package manager
+sudo yum install -y python3-pip
+
+# Confirm pip is installed
+pip3 --version
+
+# Install pandas (data processing) and numpy (math/numbers) libraries
+sudo pip3 install pandas numpy
+
+# Install SQLite — lightweight file-based database engine
+sudo yum install -y sqlite
+
+# Install tree — utility to display folder structure visually
+sudo yum install -y tree
+
+# Install cronie — the cron scheduler package (needed for automation)
+sudo yum install -y cronie
+
+# Start the cron scheduler service
+sudo systemctl start crond
+
+# Enable cron to auto-start every time EC2 reboots
+sudo systemctl enable crond
+
+# Confirm cron service is running — look for "active (running)"
+sudo systemctl status crond
+
+# Verify pandas and numpy installed correctly
+pip3 list | grep -E "pandas|numpy"
+
+# Verify SQLite installed correctly
+sqlite3 --version
+
+
+----------------------------------------------------------------
+BLOCK 4 — CREATE PROJECT FOLDER
+----------------------------------------------------------------
+
+# Create the project root folder and data subfolder in one command
+mkdir -p ~/sigma-de/data
+
+# Move into the project folder — all work happens here
+cd ~/sigma-de
+
+# Confirm you are in the right folder and it is empty
+ls
+
+
+----------------------------------------------------------------
+BLOCK 5 — CREATE DATA GENERATOR SCRIPT
+----------------------------------------------------------------
+
+# Open nano text editor to create the data generator script
+nano generate_data.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+import random
+import os
+
+random.seed(42)
+
+merchants = ['Swiggy','Zomato','Amazon','Flipkart',
+             'Uber','Ola','BigBasket','PhonePe']
+statuses  = ['success','success','success','failed']
+customers = ['Priya Sharma','Rahul Verma','Anjali Gupta','Karthik Nair',
+             'Sneha Iyer','Vikram Mehta','Divya Menon','Arjun Das',
+             'Pooja Reddy','Suresh Kumar','Meera Pillai','Ravi Shankar',
+             'Nandita Roy','Aakash Singh','Deepa Nair','Harish Patel']
+cities    = ['Mumbai','Bengaluru','Delhi','Chennai','Hyderabad',
+             'Pune','Kolkata','Ahmedabad','Jaipur','Kochi']
+
+rows = []
+for i in range(1, 101):
+    rows.append({
+        'txn_id'   : f'TXN{i:04d}',
+        'customer' : random.choice(customers),
+        'merchant' : random.choice(merchants),
+        'amount'   : round(random.uniform(50, 5000), 2),
+        'status'   : random.choice(statuses),
+        'city'     : random.choice(cities)
+    })
+
+os.makedirs('data', exist_ok=True)
+df = pd.DataFrame(rows)
+df.to_csv('data/transactions.csv', index=False)
+print(f"Generated {len(df)} transactions")
+print(df.head())
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+# Run the script — creates 100 simulated transactions in data/transactions.csv
+python3 generate_data.py
+
+
+----------------------------------------------------------------
+BLOCK 6 — CREATE PIPELINE SCRIPT (Bronze Silver Gold)
+----------------------------------------------------------------
+
+# Open nano text editor to create the ETL pipeline script
+nano process_data.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+
+# BRONZE - raw
+df = pd.read_csv('data/transactions.csv')
+print(f"BRONZE: {len(df)} rows")
+
+# SILVER - clean
+df_clean = df[df['status'] == 'success'].dropna()
+print(f"SILVER: {len(df_clean)} rows after cleaning")
+
+# GOLD - aggregate
+summary = df_clean.groupby('merchant').agg(
+    transactions = ('txn_id',  'count'),
+    total_amount = ('amount',  'sum'),
+    avg_amount   = ('amount',  'mean')
+).round(2).sort_values('total_amount', ascending=False)
+
+print("\nGOLD: Merchant Summary")
+print(summary.to_string())
+
+df.to_csv('data/bronze.csv', index=False)
+df_clean.to_csv('data/silver.csv', index=False)
+summary.to_csv('data/gold.csv')
+print("\nAll 3 layers saved.")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+# Run the pipeline — produces Bronze, Silver and Gold layer CSV files
+python3 process_data.py
+
+
+#CHECKPOINT 1 
+Your terminal shows Bronze 100 rows, Silver 75 rows, Gold 8 rows. Each layer has fewer rows than the one before. 
+Look at your screen — why does Gold only have 8 rows when you started with 100?
+Note the Answers in Word file
+
+----------------------------------------------------------------
+BLOCK 7 — CHECK YOUR FILES
+----------------------------------------------------------------
+
+# Display the data folder structure as a tree — confirms all 3 layers exist
+tree data/
+
+# Print the Gold layer to screen — this is the final business report
+cat data/gold.csv
+
+
+----------------------------------------------------------------
+BLOCK 8 — LOAD DATA INTO SQLITE DATABASE
+----------------------------------------------------------------
+
+# Open nano text editor to create the database loader script
+nano load_to_db.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+import sqlite3
+
+df = pd.read_csv('data/silver.csv')
+conn = sqlite3.connect('data/sigma.db')
+df.to_sql('transactions', conn, if_exists='replace', index=False)
+print(f"Loaded {len(df)} rows into sigma.db")
+conn.close()
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+# Run the loader — creates sigma.db and loads Silver layer data into it
+python3 load_to_db.py
+
+
+----------------------------------------------------------------
+BLOCK 9 — QUERY THE DATABASE
+----------------------------------------------------------------
+
+# Open the SQLite database — you will see sqlite> prompt
+sqlite3 data/sigma.db
+
+-- Query 1: Rank merchants by total revenue generated
+SELECT merchant,
+       COUNT(*) as txns,
+       ROUND(SUM(amount),2) as revenue
+FROM transactions
+GROUP BY merchant
+ORDER BY revenue DESC;
+
+
+-- Query 2: Find high value transactions above Rs.3000 (fraud detection use case)
+SELECT txn_id, customer, amount, city
+FROM transactions
+WHERE amount > 3000
+ORDER BY amount DESC
+LIMIT 5;
+
+
+-- Query 3: Rank cities by average customer spend (marketing use case)
+SELECT city,
+       COUNT(*) as txns,
+       ROUND(AVG(amount),2) as avg_spend
+FROM transactions
+GROUP BY city
+ORDER BY avg_spend DESC
+LIMIT 10;
+
+
+-- Exit the SQLite prompt and return to Linux terminal
+.quit
+
+#CHECKPOINT 2
+You just ran SQL queries on a database file called sigma.db. Yesterday you also queried data using pandas in Python. Both gave you results. What is the difference between querying with SQL and querying with pandas — when would you use one over the other?
+Note the Answers in Word file
+
+----------------------------------------------------------------
+BLOCK 10 — AUTOMATE WITH CRON JOB
+----------------------------------------------------------------
+
+# Open nano to create the shell script that runs the full pipeline
+nano run_pipeline.sh
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+#!/bin/bash
+cd ~/sigma-de
+echo "Pipeline run at: $(date)" >> pipeline.log
+python3 generate_data.py >> pipeline.log 2>&1
+python3 process_data.py >> pipeline.log 2>&1
+echo "Done." >> pipeline.log
+echo "---" >> pipeline.log
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+# Make the shell script executable
+chmod +x run_pipeline.sh
+
+# Run the pipeline manually once to confirm it works
+./run_pipeline.sh
+
+# Check the log file to confirm the run was recorded
+cat pipeline.log
+
+# Open crontab scheduler to add an automated schedule
+crontab -e
+
+-------- ADD THIS ONE LINE --------
+
+# This runs the pipeline automatically every minute
+* * * * * /home/ec2-user/sigma-de/run_pipeline.sh
+
+-------- SAVE: Press the keys :wq!  --------
+
+# Wait 5-10 minutes then check — you should see multiple runs with timestamp
+cat pipeline.log
+
+# Remove the cron schedule after the demo to stop auto-runs
+crontab -r
+
+#CHECKPOINT3
+Look at pipeline.log — your pipeline ran automatically without you typing anything. Now imagine this is Sigma Data Tech and this pipeline runs every minute all day. Open the log and count how many times it ran. Each run processed 100 rows. How many total rows were processed if it ran 5 times — and is that a good thing or a problem?
+
+----------------------------------------------------------------
+BLOCK 11 — SEE EVERYTHING YOU BUILT
+----------------------------------------------------------------
+
+# Display the complete project folder — all scripts, data files and logs
+tree ~/sigma-de
+
+#BONUS CHALLENGE
+Run cat pipeline.log and look at the timestamps. Your pipeline ran automatically without you touching it. Now look at your data/gold.csv — it also got updated each time. If this pipeline was running at a real company and the Gold layer gets refreshed every minute — name one problem that could cause for a business analyst who is reading that report at the same time. 
+|
+================================================================
+  YOU ARE DONE!
+  Raise your hand when pipeline.log shows 3 or more runs - 
+  CONGRATULATIONS !!! YOU HAVE RUN YOUR MINI PIPELINE ON AWS
+================================================================

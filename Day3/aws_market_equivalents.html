@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS Data Services — Market Equivalents</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f6f7f9;
+    --bg3: #eef0f4;
+    --text: #1a1a1a;
+    --text2: #555;
+    --text3: #888;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --radius: 10px;
+    --radius-sm: 6px;
+
+    --aws-bg: #FFF3E0; --aws-text: #7B3A00;
+    --gcp-bg: #E3F2FD; --gcp-text: #0D47A1;
+    --az-bg:  #EDE7F6; --az-text:  #311B92;
+    --oss-bg: #E8F5E9; --oss-text: #1B5E20;
+    --oth-bg: #FFF8E1; --oth-text: #5D4037;
+
+    --info-bg: #E3F2FD; --info-text: #0D47A1; --info-border: #90CAF9;
+    --warn-bg: #FFF3E0; --warn-text: #7B3A00; --warn-border: #FFCC80;
+    --succ-bg: #E8F5E9; --succ-text: #1B5E20; --succ-border: #A5D6A7;
+
+    --rel-bg: #E3F2FD;  --rel-text: #0C447C;
+    --nosql-bg: #E1F5EE; --nosql-text: #085041;
+    --etl-bg: #FFF3E0; --etl-text: #7B3A00;
+    --ana-bg: #FAECE7; --ana-text: #4A1B0C;
+    --stor-bg: #EDE7F6; --stor-text: #311B92;
+    --str-bg: #FCE4EC; --str-text: #4B1528;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181d;
+      --bg2: #1e2128;
+      --bg3: #262b35;
+      --text: #e8eaf0;
+      --text2: #9da5b4;
+      --text3: #6b7280;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.16);
+
+      --aws-bg: #3B2200; --aws-text: #FFCC80;
+      --gcp-bg: #0D2748; --gcp-text: #90CAF9;
+      --az-bg:  #1A1040; --az-text:  #CE93D8;
+      --oss-bg: #0A2010; --oss-text: #A5D6A7;
+      --oth-bg: #2C2000; --oth-text: #FFD54F;
+
+      --info-bg: #0D2748; --info-text: #90CAF9; --info-border: #1565C0;
+      --warn-bg: #3B2200; --warn-text: #FFCC80; --warn-border: #E65100;
+      --succ-bg: #0A2010; --succ-text: #A5D6A7; --succ-border: #2E7D32;
+
+      --rel-bg: #0D2748;  --rel-text: #90CAF9;
+      --nosql-bg: #0A2010; --nosql-text: #A5D6A7;
+      --etl-bg: #3B2200; --etl-text: #FFCC80;
+      --ana-bg: #2A1008; --ana-text: #FFAB91;
+      --stor-bg: #1A1040; --stor-text: #CE93D8;
+      --str-bg: #2A0818; --str-text: #F48FB1;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: #0D1B2A;
+    padding: 28px 40px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .header-inner { max-width: 1300px; margin: 0 auto; }
+  .header h1 { font-size: 24px; font-weight: 600; color: #fff; letter-spacing: -0.3px; }
+  .header p  { font-size: 13px; color: #8ECAE6; margin-top: 5px; }
+  .header-meta {
+    display: flex; gap: 20px; margin-top: 14px; flex-wrap: wrap;
+  }
+  .meta-tag {
+    font-size: 11px; padding: 3px 10px; border-radius: 99px;
+    background: rgba(255,255,255,0.08); color: #CAF0F8;
+  }
+
+  /* ── Main layout ── */
+  .main { max-width: 1300px; margin: 0 auto; padding: 28px 40px 60px; }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 20px;
+  }
+  .ctrl-label { font-size: 12px; color: var(--text3); white-space: nowrap; margin-right: 4px; }
+
+  .fbtn {
+    padding: 6px 14px; font-size: 12px; font-weight: 500;
+    border: 0.5px solid var(--border2); border-radius: 99px;
+    background: var(--bg); color: var(--text2);
+    cursor: pointer; transition: all .15s;
+  }
+  .fbtn:hover { background: var(--bg2); color: var(--text); }
+  .fbtn.on { background: #0D1B2A; color: #00B4D8; border-color: #00B4D8; }
+
+  .search-box {
+    margin-left: auto;
+    padding: 7px 14px; font-size: 13px;
+    border: 0.5px solid var(--border2); border-radius: 99px;
+    background: var(--bg2); color: var(--text);
+    width: 200px; outline: none;
+    transition: border-color .15s;
+  }
+  .search-box:focus { border-color: #00B4D8; }
+
+  /* ── Column header chips ── */
+  .col-chips {
+    display: grid;
+    grid-template-columns: 180px 100px 1fr 1fr 1fr 1fr 1fr;
+    gap: 6px; margin-bottom: 10px; align-items: center;
+  }
+  .col-chip {
+    font-size: 11px; font-weight: 600; padding: 4px 12px;
+    border-radius: 6px; text-align: center; letter-spacing: 0.3px;
+  }
+
+  /* ── Table ── */
+  .tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 0.5px solid var(--border2); }
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px; table-layout: fixed;
+    min-width: 900px;
+  }
+  colgroup col:nth-child(1) { width: 168px; }
+  colgroup col:nth-child(2) { width: 100px; }
+  colgroup col:nth-child(3) { width: 14%; }
+  colgroup col:nth-child(4) { width: 14%; }
+  colgroup col:nth-child(5) { width: 14%; }
+  colgroup col:nth-child(6) { width: 18%; }
+  colgroup col:nth-child(7) { width: 18%; }
+
+  thead tr { border-bottom: 1.5px solid var(--border2); background: var(--bg2); }
+  th {
+    padding: 10px 12px; text-align: left;
+    font-size: 11px; font-weight: 600;
+    color: var(--text3); letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+  th.th-aws  { color: var(--aws-text); }
+  th.th-gcp  { color: var(--gcp-text); }
+  th.th-az   { color: var(--az-text);  }
+  th.th-oss  { color: var(--oss-text); }
+  th.th-oth  { color: #BA7517; }
+
+  td {
+    padding: 10px 12px; vertical-align: top;
+    border-bottom: 0.5px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg2); }
+  tr.dimmed td { opacity: 0.18; pointer-events: none; }
+
+  td.td-name { font-weight: 600; font-size: 13px; color: var(--text); }
+  .aws-note  { font-size: 11px; color: var(--text3); margin-top: 3px; line-height: 1.4; }
+
+  /* ── Category pill ── */
+  .cat-pill {
+    display: inline-block; font-size: 10px; font-weight: 600;
+    padding: 3px 9px; border-radius: 99px; white-space: nowrap;
+  }
+
+  /* ── Chips ── */
+  .chip {
+    display: inline-block; font-size: 11px;
+    padding: 3px 8px; border-radius: 4px;
+    margin: 2px 3px 2px 0; white-space: nowrap;
+    border: 0.5px solid var(--border);
+    color: var(--text2); background: var(--bg3);
+    line-height: 1.4;
+  }
+  .chip.star {
+    background: var(--warn-bg); color: var(--warn-text);
+    border-color: var(--warn-border); font-weight: 600;
+  }
+  .chip.oss {
+    background: var(--succ-bg); color: var(--succ-text);
+    border-color: var(--succ-border);
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    margin-top: 20px; padding: 14px 18px;
+    border-radius: var(--radius-sm);
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    font-size: 12px; color: var(--text2);
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; }
+
+  /* ── Empty ── */
+  .empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--text3); font-size: 14px; display: none;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center; padding: 20px;
+    font-size: 11px; color: var(--text3);
+    border-top: 0.5px solid var(--border);
+    margin-top: 40px;
+  }
+
+  @media (max-width: 700px) {
+    .main { padding: 16px 16px 40px; }
+    .header { padding: 20px 16px 18px; }
+    .col-chips { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>AWS Data Services — Market Equivalents</h1>
+    <p>How every AWS service in the bootcamp maps to GCP, Azure, open source, and multi-cloud platforms</p>
+    <div class="header-meta">
+      <span class="meta-tag">Data Engineering Bootcamp · Sigmoid, Bengaluru</span>
+      <span class="meta-tag">Sigma Data Tech · Series B Fintech · 4M txn/day</span>
+      <span class="meta-tag">★ = part of this syllabus</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="controls">
+    <span class="ctrl-label">Filter by category:</span>
+    <button class="fbtn on" onclick="setFilter('all',this)">All</button>
+    <button class="fbtn" onclick="setFilter('relational',this)">Relational DB</button>
+    <button class="fbtn" onclick="setFilter('nosql',this)">NoSQL</button>
+    <button class="fbtn" onclick="setFilter('etl',this)">ETL / Compute</button>
+    <button class="fbtn" onclick="setFilter('analytics',this)">Analytics / DW</button>
+    <button class="fbtn" onclick="setFilter('storage',this)">Storage / Catalog</button>
+    <button class="fbtn" onclick="setFilter('stream',this)">Streaming</button>
+    <input class="search-box" type="text" placeholder="Search any service..." oninput="doSearch(this.value)" id="srch">
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <colgroup>
+        <col><col><col><col><col><col><col>
+      </colgroup>
+      <thead>
+        <tr>
+          <th>AWS service</th>
+          <th>Category</th>
+          <th class="th-aws">AWS (managed)</th>
+          <th class="th-gcp">GCP equivalent</th>
+          <th class="th-az">Azure equivalent</th>
+          <th class="th-oss">Open source</th>
+          <th class="th-oth">Multi-cloud / SaaS</th>
+        </tr>
+      </thead>
+      <tbody id="body"></tbody>
+    </table>
+    <div class="empty" id="empty">No services match your search</div>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item">
+      <span class="chip star">★ Databricks</span> Part of this bootcamp syllabus
+    </div>
+    <div class="legend-item">
+      <span class="chip oss">Apache Kafka</span> Open source / free / self-hosted
+    </div>
+    <div class="legend-item">
+      <span class="chip">Confluent</span> Commercial SaaS / managed service
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Day 4 · Module 8 (AWS Glue) + Module 10 (Amazon Athena) · Data Engineering Bootcamp · Sigmoid, Bengaluru
+</div>
+
+<script>
+const CAT = {
+  relational: { label: 'Relational DB',    bg: '#E3F2FD', text: '#0C447C' },
+  nosql:      { label: 'NoSQL / KV',       bg: '#E1F5EE', text: '#085041' },
+  etl:        { label: 'ETL / Compute',    bg: '#FFF3E0', text: '#7B3A00' },
+  analytics:  { label: 'Analytics / DW',   bg: '#FAECE7', text: '#4A1B0C' },
+  storage:    { label: 'Storage / Catalog',bg: '#EDE7F6', text: '#311B92' },
+  stream:     { label: 'Streaming',        bg: '#FCE4EC', text: '#4B1528' },
+};
+
+const SYLLABUS = ['Databricks', 'Snowflake'];
+
+const rows = [
+  {
+    aws: 'Amazon RDS', cat: 'relational',
+    awsNote: 'MySQL, PostgreSQL, MariaDB, Oracle, SQL Server — AWS handles patching, backups, Multi-AZ',
+    gcp:   ['Cloud SQL', 'AlloyDB'],
+    azure: ['Azure SQL Database', 'Azure DB for MySQL / PostgreSQL'],
+    oss:   ['PostgreSQL', 'MySQL', 'MariaDB'],
+    other: ['PlanetScale', 'Neon', 'Supabase'],
+  },
+  {
+    aws: 'Amazon Aurora', cat: 'relational',
+    awsNote: 'AWS-rebuilt MySQL/PG — 5× faster, storage auto-scales to 128 TB, ~30s failover',
+    gcp:   ['AlloyDB', 'Cloud Spanner'],
+    azure: ['Azure SQL Hyperscale', 'Cosmos DB (PostgreSQL API)'],
+    oss:   ['CockroachDB', 'YugabyteDB'],
+    other: ['SingleStore', 'Neon'],
+  },
+  {
+    aws: 'DynamoDB', cat: 'nosql',
+    awsNote: 'Serverless key-value / document store — single-digit ms at any scale, pay per request',
+    gcp:   ['Firestore', 'Bigtable'],
+    azure: ['Cosmos DB', 'Azure Table Storage'],
+    oss:   ['Apache Cassandra', 'MongoDB', 'Redis', 'Apache HBase'],
+    other: ['MongoDB Atlas', 'DataStax Astra'],
+  },
+  {
+    aws: 'Amazon S3', cat: 'storage',
+    awsNote: 'Object storage — unlimited, ~$0.023/GB/month; the centre of every AWS data lake',
+    gcp:   ['Google Cloud Storage (GCS)'],
+    azure: ['Azure Data Lake Storage Gen2', 'Azure Blob Storage'],
+    oss:   ['MinIO', 'Ceph'],
+    other: ['Databricks DBFS / Unity Catalog (on top of S3 / GCS / ADLS)'],
+  },
+  {
+    aws: 'AWS Glue (ETL Jobs)', cat: 'etl',
+    awsNote: 'Serverless PySpark ETL — DynamicFrames, Job Bookmarks, Glue Studio visual editor',
+    gcp:   ['Cloud Dataflow (Apache Beam)', 'Dataproc Serverless Spark'],
+    azure: ['Azure Data Factory', 'Azure Synapse Pipelines'],
+    oss:   ['Apache Spark', 'Apache Beam', 'dbt (SQL transforms)', 'Airbyte'],
+    other: ['Databricks Jobs / Workflows', 'Informatica IDMC', 'Fivetran', 'Airbyte Cloud'],
+  },
+  {
+    aws: 'AWS Glue Data Catalog', cat: 'storage',
+    awsNote: 'Hive-Metastore-compatible central schema registry — used by Athena, EMR, Redshift Spectrum',
+    gcp:   ['Google Dataplex', 'Data Catalog'],
+    azure: ['Microsoft Purview', 'Azure Data Catalog'],
+    oss:   ['Apache Hive Metastore', 'Apache Atlas', 'OpenMetadata', 'Amundsen'],
+    other: ['Databricks Unity Catalog', 'Alation', 'Collibra'],
+  },
+  {
+    aws: 'Amazon EMR', cat: 'etl',
+    awsNote: 'Managed Hadoop + Spark cluster — Spot Instances, EMRFS (S3 as HDFS), EMR Serverless',
+    gcp:   ['Cloud Dataproc'],
+    azure: ['Azure HDInsight', 'Azure Databricks (Spark)'],
+    oss:   ['Apache Spark', 'Apache Hadoop', 'Apache Flink', 'Apache Hive'],
+    other: ['Databricks Lakehouse Platform', 'Cloudera CDP', 'Qubole'],
+  },
+  {
+    aws: 'AWS Lambda', cat: 'etl',
+    awsNote: 'Serverless functions — event-driven, max 15 min / 10 GB RAM, pay per 1 ms',
+    gcp:   ['Cloud Functions', 'Cloud Run'],
+    azure: ['Azure Functions', 'Azure Logic Apps'],
+    oss:   ['OpenFaaS', 'Knative', 'Apache OpenWhisk'],
+    other: ['Databricks Workflows (lightweight task nodes)'],
+  },
+  {
+    aws: 'Amazon Athena', cat: 'analytics',
+    awsNote: 'Serverless Presto — SQL on S3, $5/TB scanned, reads Glue Catalog, no cluster to manage',
+    gcp:   ['BigQuery (serverless mode)'],
+    azure: ['Azure Synapse Analytics (serverless SQL pool)'],
+    oss:   ['Apache Presto / Trino', 'Apache Drill', 'DuckDB'],
+    other: ['Databricks SQL Warehouse', 'Starburst Enterprise', 'Ahana'],
+  },
+  {
+    aws: 'Amazon Redshift', cat: 'analytics',
+    awsNote: 'Managed MPP columnar data warehouse — Concurrency Scaling, Redshift Spectrum (query S3)',
+    gcp:   ['BigQuery'],
+    azure: ['Azure Synapse Analytics (dedicated SQL pool)'],
+    oss:   ['Apache Druid', 'ClickHouse', 'Greenplum', 'StarRocks'],
+    other: ['Snowflake', 'Databricks Lakehouse', 'Teradata VantageCloud', 'IBM Netezza'],
+  },
+  {
+    aws: 'Snowflake (on AWS)', cat: 'analytics',
+    awsNote: 'Multi-cloud DW — fully separated storage & compute, Time Travel, Zero-copy Clone, Data Sharing',
+    gcp:   ['BigQuery', 'Snowflake on GCP'],
+    azure: ['Azure Synapse Analytics', 'Snowflake on Azure'],
+    oss:   ['Apache Iceberg + Trino', 'DuckDB (small-scale)'],
+    other: ['Databricks Lakehouse (Delta Lake)', 'Teradata VantageCloud', 'Google AlloyDB Omni'],
+  },
+  {
+    aws: 'Amazon Kinesis', cat: 'stream',
+    awsNote: 'Real-time event streaming (Kafka-compatible API available) — Streams + Firehose + Analytics',
+    gcp:   ['Cloud Pub/Sub', 'Datastream', 'Cloud Dataflow (Flink)'],
+    azure: ['Azure Event Hubs', 'Azure Service Bus', 'Azure Stream Analytics'],
+    oss:   ['Apache Kafka', 'Apache Pulsar', 'Apache Flink', 'RabbitMQ'],
+    other: ['Confluent Cloud', 'Redpanda', 'Databricks Structured Streaming'],
+  },
+  {
+    aws: 'Databricks (on AWS)', cat: 'etl',
+    awsNote: 'Lakehouse platform on AWS — Apache Spark + Delta Lake + Databricks SQL + Unity Catalog',
+    gcp:   ['Databricks on GCP', 'BigQuery + Spark (Dataproc)'],
+    azure: ['Azure Databricks', 'Azure Synapse Spark'],
+    oss:   ['Apache Spark + Delta Lake', 'Apache Iceberg + Apache Flink', 'dbt + DuckDB'],
+    other: ['Snowpark (Snowflake)', 'Cloudera CDP', 'Palantir Foundry'],
+  },
+];
+
+let curFilter = 'all', curSearch = '';
+
+function pillHtml(cat) {
+  const c = CAT[cat];
+  return `<span class="cat-pill" style="background:${c.bg};color:${c.text}">${c.label}</span>`;
+}
+
+function chipHtml(text, isOss) {
+  const isStar = SYLLABUS.some(k => text.includes(k));
+  const cls = isStar ? 'chip star' : isOss ? 'chip oss' : 'chip';
+  return `<span class="${cls}">${text}</span>`;
+}
+
+function render() {
+  const body = document.getElementById('body');
+  const q = curSearch.toLowerCase().trim();
+  let count = 0;
+  let html = '';
+
+  rows.forEach(r => {
+    const allText = (r.aws + r.awsNote + r.gcp.join() + r.azure.join() + r.oss.join() + r.other.join()).toLowerCase();
+    const matchCat = curFilter === 'all' || r.cat === curFilter;
+    const matchQ = !q || allText.includes(q);
+    const dim = !matchCat || !matchQ;
+    if (matchCat && matchQ) count++;
+
+    const gcpHtml   = r.gcp.map(x => chipHtml(x, false)).join('');
+    const azHtml    = r.azure.map(x => chipHtml(x, false)).join('');
+    const ossHtml   = r.oss.map(x => chipHtml(x, true)).join('');
+    const otherHtml = r.other.map(x => chipHtml(x, false)).join('');
+
+    html += `<tr class="${dim ? 'dimmed' : ''}">
+      <td class="td-name">${r.aws}</td>
+      <td>${pillHtml(r.cat)}</td>
+      <td><div class="aws-note">${r.awsNote}</div></td>
+      <td>${gcpHtml}</td>
+      <td>${azHtml}</td>
+      <td>${ossHtml}</td>
+      <td>${otherHtml}</td>
+    </tr>`;
+  });
+
+  body.innerHTML = html;
+  document.getElementById('empty').style.display = count === 0 ? 'block' : 'none';
+}
+
+function setFilter(f, btn) {
+  curFilter = f;
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  render();
+}
+
+function doSearch(v) {
+  curSearch = v;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+================================================================
+  SIGMA DATA TECH — DAY 3 HANDS-ON LABS
+  Lab 1 of 3 — S3 Data Lake Simulation on EC2
+  Duration: 35 minutes
+================================================================
+
+WHAT YOU WILL BUILD:
+  Bronze / Silver / Gold folder structure (S3 style)
+  Parquet file format (what real data lakes use)
+  Partition-style folder layout (what makes Athena fast)
+  Lifecycle cost simulation
+
+----------------------------------------------------------------
+STEP 1 — SETUP
+----------------------------------------------------------------
+
+# Connect to your EC2
+EC2 Instance connect
+
+# Create the lab folder
+mkdir -p ~/day3-lab1
+cd ~/day3-lab1
+
+# Install pyarrow — needed to write Parquet files
+sudo pip3 install pyarrow
+
+# Verify installation
+python3 -c "import pyarrow; print('pyarrow OK:', pyarrow.__version__)"
+
+
+----------------------------------------------------------------
+STEP 2 — CREATE S3-STYLE FOLDER STRUCTURE
+----------------------------------------------------------------
+
+# Create the full data lake folder layout (mirrors real S3 bucket)
+mkdir -p data/bronze/transactions/year=2024/month=01/day=15
+mkdir -p data/silver/clean_transactions/year=2024/month=01
+mkdir -p data/gold/merchant_summary
+mkdir -p data/archive/raw/year=2023
+
+# See the full structure you just created
+find data/ -type d
+
+
+----------------------------------------------------------------
+STEP 3 — CREATE DATA GENERATOR (saves as Parquet)
+----------------------------------------------------------------
+
+# Open editor to create the ingestion script
+nano ingest_bronze.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import random
+import os
+
+random.seed(42)
+
+merchants = ['Swiggy','Zomato','Amazon','Flipkart',
+             'Uber','Ola','BigBasket','PhonePe']
+statuses  = ['success','success','success','failed']
+customers = ['Priya Sharma','Rahul Verma','Anjali Gupta','Karthik Nair',
+             'Sneha Iyer','Vikram Mehta','Divya Menon','Arjun Das',
+             'Pooja Reddy','Suresh Kumar','Meera Pillai','Ravi Shankar',
+             'Nandita Roy','Aakash Singh','Deepa Nair','Harish Patel']
+cities    = ['Mumbai','Bengaluru','Delhi','Chennai','Hyderabad',
+             'Pune','Kolkata','Ahmedabad','Jaipur','Kochi']
+
+rows = []
+for i in range(1, 201):
+    rows.append({
+        'txn_id'   : f'TXN{i:04d}',
+        'customer' : random.choice(customers),
+        'merchant' : random.choice(merchants),
+        'amount'   : round(random.uniform(50, 5000), 2),
+        'status'   : random.choice(statuses),
+        'city'     : random.choice(cities)
+    })
+
+df = pd.DataFrame(rows)
+os.makedirs('data/bronze/transactions/year=2024/month=01/day=15', exist_ok=True)
+
+# Save as CSV (Bronze — raw)
+csv_path = 'data/bronze/transactions/year=2024/month=01/day=15/txn_20240115.csv'
+df.to_csv(csv_path, index=False)
+print(f"CSV saved  : {len(df)} rows")
+print(f"CSV size   : {os.path.getsize(csv_path):,} bytes")
+
+# Save as Parquet
+parquet_path = 'data/bronze/transactions/year=2024/month=01/day=15/txn_20240115.parquet'
+pq.write_table(pa.Table.from_pandas(df), parquet_path, compression='snappy')
+print(f"Parquet size: {os.path.getsize(parquet_path):,} bytes")
+
+csv_size     = os.path.getsize(csv_path)
+parquet_size = os.path.getsize(parquet_path)
+saving_pct   = round((1 - parquet_size/csv_size) * 100, 1)
+print(f"\nStorage saving with Parquet: {saving_pct}% smaller than CSV")
+print(f"At 4M transactions/day that saving multiplies massively")
+print(df.head())
+
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+# Run the ingestion script
+python3 ingest_bronze.py
+
+
+#CHECKPOINT 1
+Run this command and look at the two file sizes: ls -lh data/bronze/transactions/year=2024/month=01/day=15/ — The CSV and Parquet file have exactly the same data inside. So why is one smaller than the other?  Note your answers in Word File
+
+----------------------------------------------------------------
+STEP 4 — SILVER LAYER (clean + save as Parquet)
+----------------------------------------------------------------
+
+nano transform_silver.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+import os
+
+# Read Bronze CSV (simple, no schema conflicts)
+csv_path = 'data/bronze/transactions/year=2024/month=01/day=15/txn_20240115.csv'
+df = pd.read_csv(csv_path)
+print(f"BRONZE read: {len(df)} rows")
+
+# Clean
+df_clean = df[df['status'] == 'success'].dropna()
+print(f"SILVER: {len(df_clean)} rows after removing failed/null")
+
+# Save Silver as CSV
+os.makedirs('data/silver/clean_transactions/year=2024/month=01', exist_ok=True)
+out_path = 'data/silver/clean_transactions/year=2024/month=01/clean_txn.csv'
+df_clean.to_csv(out_path, index=False)
+print(f"Silver saved: {out_path}")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 transform_silver.py
+
+
+#CHECKPOINT 2
+Your Bronze had 200 rows. Silver has around 150. Open transform_silver.py and find the two lines that caused this drop. 
+Write those two conditions in plain English. Note your answers in a Word file
+
+----------------------------------------------------------------
+STEP 5 — GOLD LAYER (aggregate + save)
+----------------------------------------------------------------
+
+nano aggregate_gold.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+import os
+
+# Read Silver CSV
+df = pd.read_csv(
+    'data/silver/clean_transactions/year=2024/month=01/clean_txn.csv'
+)
+print(f"Silver read: {len(df)} rows")
+
+# Aggregate
+summary = df.groupby('merchant').agg(
+    transactions  = ('txn_id',  'count'),
+    total_revenue = ('amount',  'sum'),
+    avg_ticket    = ('amount',  'mean'),
+    top_city      = ('city',    lambda x: x.mode()[0])
+).round(2).sort_values('total_revenue', ascending=False)
+
+print("\nGOLD — Merchant Summary:")
+print(summary.to_string())
+
+# Save Gold as CSV
+os.makedirs('data/gold/merchant_summary', exist_ok=True)
+out_path = 'data/gold/merchant_summary/summary.csv'
+summary.reset_index().to_csv(out_path, index=False)
+print(f"\nGold saved: {out_path}")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 aggregate_gold.py
+
+#CHECKPOINT 3 
+Run 
+cat data/gold/merchant_summary/summary.csv 
+and look at your output. Which merchant made the most total revenue? Does that same merchant also have the highest average ticket? 
+Tell me what you think that means. Note your answers in Word file and save the file with team name in LMS. 
+
+----------------------------------------------------------------
+STEP 6 — SIMULATE ATHENA-STYLE SQL QUERY
+----------------------------------------------------------------
+
+nano query_datalake.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import pandas as pd
+
+print("=" * 50)
+print("SIMULATING: Athena SQL on data lake")
+print("=" * 50)
+
+# Read Silver CSV
+df = pd.read_csv(
+    'data/silver/clean_transactions/year=2024/month=01/clean_txn.csv',
+    usecols=['merchant', 'amount', 'city', 'status']
+)
+
+print(f"\nPartition scanned: year=2024/month=01")
+print(f"Rows read        : {len(df)}")
+
+# Query 1: top merchants
+print("\n-- SELECT merchant, SUM(amount) GROUP BY merchant --")
+q1 = df.groupby('merchant')['amount'].sum().sort_values(ascending=False)
+print(q1.to_string())
+
+# Query 2: high value filter
+print("\n-- SELECT * WHERE amount > 4000 --")
+q2 = df[df['amount'] > 4000][['merchant', 'amount', 'city']]
+print(q2.to_string(index=False))
+
+# Query 3: city breakdown
+print("\n-- SELECT city, COUNT(*) GROUP BY city --")
+q3 = df.groupby('city').size().sort_values(ascending=False)
+print(q3.to_string())
+
+print("\nIn real Athena: this SQL runs on S3 files directly.")
+print("Cost = $5 per TB scanned. Parquet reduces scan size 10x.")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 query_datalake.py
+
+
+
+----------------------------------------------------------------
+STEP 7 — SIMULATE LIFECYCLE (storage class aging)
+----------------------------------------------------------------
+
+nano lifecycle_sim.py
+
+-------- PASTE THIS ENTIRE BLOCK INTO nano --------
+
+import os
+
+files = {
+    'data/bronze/transactions/year=2024/month=01/day=15/txn_20240115.parquet': {
+        'age_days': 10, 'class': 'Standard'
+    },
+    'data/silver/clean_transactions/year=2024/month=01/clean_txn.parquet': {
+        'age_days': 45, 'class': 'Standard-IA'
+    },
+    'data/gold/merchant_summary/summary.parquet': {
+        'age_days': 5, 'class': 'Standard'
+    },
+}
+
+print("=" * 60)
+print("LIFECYCLE SIMULATION — Sigma Data Tech")
+print("=" * 60)
+print(f"{'File':<52} {'Age':>6} {'Class':<15} {'Cost/GB/mo'}")
+print("-" * 60)
+
+costs = {'Standard': 0.023, 'Standard-IA': 0.0125, 'Glacier': 0.004}
+
+for path, info in files.items():
+    age   = info['age_days']
+    cls   = info['class']
+    fname = path.split('/')[-1]
+    size  = os.path.getsize(path) if os.path.exists(path) else 0
+
+    # Apply lifecycle rules
+    if age > 365:
+        cls = 'Glacier'
+    elif age > 90:
+        cls = 'Standard-IA'
+
+    cost_per_gb = costs[cls]
+    file_gb     = size / (1024**3)
+    monthly_cost= file_gb * cost_per_gb
+
+    print(f"{fname:<52} {age:>4}d  {cls:<15} ${cost_per_gb}/GB")
+
+print("-" * 60)
+print("Rule: Standard(0-30d) → Standard-IA(30-90d) → Glacier(90d+)")
+print("Automating this lifecycle = zero manual effort, big savings.")
+
+-------- SAVE: press Ctrl+O then Enter then Ctrl+X --------
+
+python3 lifecycle_sim.py
+
+----------------------------------------------------------------
+STEP 8 — SEE YOUR COMPLETE DATA LAKE
+----------------------------------------------------------------
+
+# Show the full folder structure
+find data/ -type f | sort
+
+# Check file sizes — see Parquet vs CSV difference
+ls -lh data/bronze/transactions/year=2024/month=01/day=15/
+
+
+================================================================
+  LAB 1 DONE!
+  Raise your hand when you see Gold merchant summary printed
+================================================================
